@@ -3,7 +3,6 @@
 module Data.List.Fused (
     Fused(..),
     fuseboth,
-    empty,
     
     map,
     concat,
@@ -12,6 +11,8 @@ module Data.List.Fused (
     scanl,
     scanl',
     scanr,
+    mapAccumL,
+    mapAccumR,
     
     filter,
     takeWhile,
@@ -48,7 +49,29 @@ module Data.List.Fused (
     Data.Foldable.find
 ) where
 
-import Prelude hiding (map, concat, concatMap, scanl, scanl', scanr, filter, takeWhile, dropWhile, take, drop, iterate, iterate', repeat, replicate, cycle,)
+import Prelude hiding (
+    map,
+    concat,
+    concatMap,
+    
+    scanl,
+    scanl',
+    scanr,
+    mapAccumL,
+    mapAccumR,
+    
+    filter,
+    takeWhile,
+    dropWhile,
+    take,
+    drop,
+    
+    iterate,
+    iterate',
+    repeat,
+    replicate,
+    cycle)
+
 import qualified Prelude
 
 import qualified Data.Foldable
@@ -56,7 +79,12 @@ import qualified Data.Foldable
 import Control.Monad (ap)
 import Control.Applicative 
 
+import Data.List.FoldBoth
+
 newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r -> (l, r)}
+
+fromList :: [a] -> Fused a
+fromList xs = Fused (\f l r -> foldboth f l r xs)
 
 {-# INLINE fuseboth #-}
 fuseboth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)
@@ -69,7 +97,9 @@ instance Foldable Fused where
     foldr f z = snd . fuseboth (\_ a r -> ((), f a r)) () z
     foldl f z = fst . fuseboth (\l a _ -> (f l a, ())) z ()
 
--- There's a Traversable instance, but it doesn't fuse
+-- The traversable instance doesn't fuse
+instance Traversable Fused where
+    traverse k = fmap fromList . traverse k . Data.Foldable.toList
 
 instance Applicative Fused where
     pure x = Fused (\f l r -> f l x r)
@@ -125,9 +155,26 @@ scanr s z xs = Fused (\f lz rz ->
                                     (l1, r1) = f l acc' r
                                     in (l1, (acc', r1))
                             in (l2, r1))
+     
+{-# INLINE mapAccumL #-}
+mapAccumL :: (a -> b -> (a, c)) -> a -> Fused b -> Fused c
+mapAccumL s z xs = Fused (\f lz rz ->
+                            let ((_, lf), rf) = fused xs step (z, lz) rz
+                                step (acc, l) x r =
+                                    let (acc', y) = s acc x
+                                        (l', r') = f l y r
+                                        in ((acc', l'), r')
+                                in (lf, rf))
 
-
-
+{-# INLINE mapAccumR #-}
+mapAccumR :: (a -> b -> (a, c)) -> a -> Fused b -> Fused c
+mapAccumR s z xs = Fused (\f lz rz ->
+                            let (lf, (_, rf)) = fused xs step lz (z, rz)
+                                step l x (acc, r) =
+                                    let (acc', y) = s acc x
+                                        (l', r') = f l y r
+                                        in (l', (acc', r'))
+                                in (lf, rf))
 
 {-# INLINE filter #-}
 filter :: (a -> Bool) -> Fused a -> Fused a
