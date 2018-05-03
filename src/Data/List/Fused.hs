@@ -2,25 +2,42 @@
 
 module Data.List.Fused (
     Fused(..),
-    fuseboth,
+    fuseBoth,
     fromList,
     
     map,
     concat,
     concatMap,
+    append,
     
+    -- * Scans
     scanl,
     scanl',
     scanr,
     mapAccumL,
     mapAccumR,
     
+    -- * Filtering
     filter,
     takeWhile,
     dropWhile,
     take,
     drop,
     
+    -- * Extrema
+    extremaBy,
+    minimums,
+    maximums,
+    
+    -- * Grouping
+    runLengthEncode,
+    group,
+    
+    -- * Transformations
+    intersperse,
+    intercalate,
+    
+    -- * Construction
     cons,
     snoc,
     iterate,
@@ -29,15 +46,7 @@ module Data.List.Fused (
     replicate,
     cycle,
     
-    intersperse,
-    intercalate,
-    
-    extremaBy,
-    minimums,
-    maximums,
-    runLengthEncode,
-    group,
-    
+    -- * Re-exports
     Data.Foldable.Foldable(..),
     Data.Foldable.foldrM,
     Data.Foldable.foldlM,
@@ -56,7 +65,7 @@ module Data.List.Fused (
     Data.Foldable.maximumBy,
     Data.Foldable.minimumBy,
     Data.Foldable.notElem,
-    Data.Foldable.find
+    Data.Foldable.find,
 ) where
 
 import Prelude hiding (
@@ -91,22 +100,24 @@ import Control.Applicative
 
 import Data.List.FoldBoth
 
+-- | A list represented by its 'foldBoth' function.
 newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r -> (l, r)}
 
 {-# INLINE fromList #-}
+-- | Convert a list to 'Fused' via its 'foldBoth' function
 fromList :: [a] -> Fused a
-fromList xs = Fused (\f l r -> foldboth f l r xs)
+fromList xs = Fused (\f l r -> foldBoth f l r xs)
 
-{-# INLINE fuseboth #-}
-fuseboth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)
-fuseboth f lz rz xs = fused xs f lz rz
+{-# INLINE fuseBoth #-}
+fuseBoth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)
+fuseBoth f lz rz xs = fused xs f lz rz
 
 instance Functor Fused where
     fmap = map
 
 instance Foldable Fused where
-    foldr f z = snd . fuseboth (\_ a r -> ((), f a r)) () z
-    foldl f z = fst . fuseboth (\l a _ -> (f l a, ())) z ()
+    foldr f z = snd . fuseBoth (\_ a r -> ((), f a r)) () z
+    foldl f z = fst . fuseBoth (\l a _ -> (f l a, ())) z ()
 
 -- The traversable instance doesn't fuse
 instance Traversable Fused where
@@ -122,11 +133,7 @@ instance Monad Fused where
 
 instance Alternative Fused where
     empty = Fused (\_ l r -> (l, r))
-    xs <|> ys = Fused (\f lz rz -> 
-        let
-          (l1, r1) = fused xs f lz r2
-          (l2, r2) = fused ys f l1 rz
-          in (l2, r1))
+    (<|>) = append
           
 instance MonadPlus Fused
 
@@ -141,6 +148,14 @@ concat xs = Fused (\f -> fused xs (\l ys r -> fused ys f l r))
 {-# INLINE concatMap #-}
 concatMap :: (a -> Fused b) -> Fused a -> Fused b
 concatMap k xs = Fused (\f -> fused xs (\l x r -> fused (k x) f l r))
+
+{-# INLINE append #-}
+append :: Fused a -> Fused a -> Fused a
+append xs ys = Fused (\f lz rz -> 
+                    let
+                        (l1, r1) = fused xs f lz r2
+                        (l2, r2) = fused ys f l1 rz
+                        in (l2, r1))
 
 
 {-# INLINE scanl #-}
@@ -262,6 +277,7 @@ iterate f = go
     go x = x `cons` go (f x)
     
 {-# INLINE iterate' #-}
+-- | The strict version of 'iterate'
 iterate' :: (a -> a) -> a -> Fused a
 iterate' f = iterate (\x -> x `seq` f x)
 
@@ -305,6 +321,7 @@ intercalate x xs = concat (intersperse x xs)
 -- minimums
 
 {-# INLINE extremaBy #-}
+-- | Compute extrema of a fused list. @'extremaBy' cmp@ will including a value @x@ if @x \`cmp\` y@ holds for the previous extreme value @y@.
 extremaBy :: (a -> a -> Bool) -> Fused a -> Fused a
 extremaBy cmp xs = Fused (\f lz rz -> 
                     let ((_, lf), rf) = fused xs step ((const True), lz) rz
@@ -315,10 +332,12 @@ extremaBy cmp xs = Fused (\f lz rz ->
                         in (lf, rf))
 
 {-# INLINE minimums #-}
+-- | Minimums of a list, equivalent to @'extremaBy' ('<')@.
 minimums :: Ord a => Fused a -> Fused a
 minimums = extremaBy (<)
 
 {-# INLINE maximums #-}
+-- | Maximums of a list, equivalent to @'extremaBy' ('>')@.
 maximums :: Ord a => Fused a -> Fused a
 maximums = extremaBy (>)
 
