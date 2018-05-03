@@ -1,19 +1,53 @@
 
-module Data.List.FoldBoth where
+module Data.List.FoldBoth (
+  -- * Bi-directional folds
+  foldBoth,
+  foldBoth',
+  foldBothBy,
+  foldBothBy',
+  -- * Convenience functions
+  folded,
+  foldedBy,
+) where
 
--- todo: reimplement in terms of foldr so that it can fuse, be defined for all Foldables
+import GHC.Exts (oneShot)
+
 -- | Fold from both the left and right sides at the same time.
-foldBoth :: (l -> a -> r -> (l, r)) -> l -> r -> [a] -> (l, r)
-foldBoth f = go
-  where
-    go l r [] = (l, r)
-    go l r (x:xs) = (l'', r'')
-      where
-        (l', r'') = f l x r'
-        ~(l'', r') = go l' r xs
+{-# INLINE foldBoth #-}
+foldBoth :: Foldable t => (l -> a -> r -> (l, r)) -> l -> r -> t a -> (l, r)
+foldBoth k lz rz xs = foldBothBy (folded xs) k lz rz
 
 -- | A version of 'foldBoth' that is strict in the left argument
-foldBoth' :: (l -> a -> r -> (l , r)) -> l -> r -> [a] -> (l, r)
-foldBoth' f = foldBoth f'
-  where
-    f' l x r = l `seq` f l x r
+{-# INLINE foldBoth' #-}
+foldBoth' :: Foldable t => (l -> a -> r -> (l , r)) -> l -> r -> t a -> (l, r)
+foldBoth' k lz rz xs = foldBothBy' (folded xs) k lz rz
+    
+type FoldR a b = (a -> b -> b) -> b -> b
+
+-- | A version of 'foldBoth' that doesn't require a Foldable
+{-# INLINE foldBothBy #-}
+foldBothBy :: FoldR a (l -> (l, r)) -> (l -> a -> r -> (l, r)) -> l -> r -> (l, r)
+foldBothBy foldr k lz rz = 
+  foldr (\x fn -> oneShot (\l -> 
+                                let ~(l1, r1) = fn l2
+                                    ~(l2, r2) = k l x r1
+                                    in (l1, r2))) (\l -> (l, rz)) lz
+                                    
+-- | Strict version of 'foldBothBy''
+{-# INLINE foldBothBy' #-}
+foldBothBy' :: FoldR a (l -> (l, r)) -> (l -> a -> r -> (l, r)) -> l -> r -> (l, r)
+foldBothBy' foldr k lz rz = 
+  foldr (\x fn -> oneShot (\l -> l `seq`
+                                let ~(l1, r1) = fn l2
+                                    ~(l2, r2) = k l x r1
+                                    in (l1, r2))) (\l -> (l, rz)) lz
+                                    
+-- | Rearrange the arguments to 'foldr' so that the structure it acts on is the first argument
+{-# INLINE folded #-}
+folded :: Foldable t => t a -> FoldR a b
+folded = foldedBy foldr
+
+-- | Rearrange the arguments to a foldr-like function so that the structure it acts on is the first argument
+{-# INLINE foldedBy #-}
+foldedBy :: ( (a -> b -> b) -> b -> xs -> b ) -> xs -> FoldR a b
+foldedBy foldr xs k z = foldr k z xs

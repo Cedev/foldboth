@@ -1,0 +1,37 @@
+	Thu May  3 21:34 2018 Time and Allocation Profiling Report  (Final)
+
+	   foldboth-exe +RTS -N -p -RTS
+
+	total time  =        2.98 secs   (2985 ticks @ 1000 us, 1 processor)
+	total alloc = 4,081,248,616 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE          SRC                               %time %alloc
+
+foldr       Data.List.Fused src/Data/List/Fused.hs:140:5-59    93.6  100.0
+foldr.\     Data.List.Fused src/Data/List/Fused.hs:140:43-53    6.4    0.0
+
+
+                                                                                                         individual      inherited
+COST CENTRE                    MODULE                SRC                              no.     entries  %time %alloc   %time %alloc
+
+MAIN                           MAIN                  <built-in>                       197          0    0.0    0.0   100.0  100.0
+ CAF                           GHC.Conc.Signal       <entire-module>                  312          0    0.0    0.0     0.0    0.0
+ CAF                           GHC.IO.Encoding       <entire-module>                  295          0    0.0    0.0     0.0    0.0
+ CAF                           GHC.IO.Encoding.Iconv <entire-module>                  293          0    0.0    0.0     0.0    0.0
+ CAF                           GHC.IO.Handle.FD      <entire-module>                  285          0    0.0    0.0     0.0    0.0
+ CAF                           GHC.IO.Handle.Text    <entire-module>                  283          0    0.0    0.0     0.0    0.0
+ CAF                           GHC.Event.Thread      <entire-module>                  244          0    0.0    0.0     0.0    0.0
+ CAF                           GHC.Event.Poll        <entire-module>                  216          0    0.0    0.0     0.0    0.0
+ CAF:$fAlternativeFused_$cfmap Data.List.Fused       src/Data/List/Fused.hs:137:5-8   348          0    0.0    0.0     0.0    0.0
+  fmap                         Data.List.Fused       src/Data/List/Fused.hs:137:5-14  400          1    0.0    0.0     0.0    0.0
+ CAF:lvl7_r75b                 Main                  <no location info>               391          0    0.0    0.0     0.0    0.0
+  main                         Main                  app/Main.hs:(27,1)-(29,37)       396          0    0.0    0.0     0.0    0.0
+   foldr                       Data.List.Fused       src/Data/List/Fused.hs:140:5-59  397          1    0.0    0.0     0.0    0.0
+ CAF:main1                     Main                  <no location info>               392          0    0.0    0.0     0.0    0.0
+  main                         Main                  app/Main.hs:(27,1)-(29,37)       394          1    0.0    0.0     0.0    0.0
+ CAF:xs1_r757                  Main                  <no location info>               390          0    0.0    0.0     0.0    0.0
+  main                         Main                  app/Main.hs:(27,1)-(29,37)       401          0    0.0    0.0     0.0    0.0
+ main                          Main                  app/Main.hs:(27,1)-(29,37)       395          0    0.0    0.0   100.0  100.0
+  foldr                        Data.List.Fused       src/Data/List/Fused.hs:140:5-59  398          0   93.6  100.0   100.0  100.0
+   foldr.\                     Data.List.Fused       src/Data/List/Fused.hs:140:43-53 402    4000428    6.4    0.0     6.4    0.0
+   fused                       Data.List.Fused       src/Data/List/Fused.hs:111:26-30 399    2000005    0.0    0.0     0.0    0.0

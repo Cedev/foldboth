@@ -5,6 +5,9 @@ module Data.List.Fused (
     Fused(..),
     fuseBoth,
     fromList,
+    fromFoldable,
+    fromFoldR,
+    from,
     
     map,
     concat,
@@ -102,13 +105,29 @@ import Control.Monad
 
 import Data.List.FoldBoth
 
+import GHC.Exts (oneShot)
+
 -- | A list represented by its 'foldBoth' function.
 newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r -> (l, r)}
 
+
+{-# INLINE fromFoldable #-}
+-- | Convert a 'Foldable' to 'Fused' via its 'foldBoth'' function
+fromFoldable :: Foldable t => t a -> Fused a
+fromFoldable xs = Fused (\f l r -> foldBoth' f l r xs)
+
 {-# INLINE fromList #-}
--- | Convert a list to 'Fused' via its 'foldBoth' function
+-- | Convert a list to 'Fused' via its 'foldBoth'' function
 fromList :: [a] -> Fused a
 fromList xs = Fused (\f l r -> foldBoth' f l r xs)
+
+{-# INLINE fromFoldR #-}
+fromFoldR :: (forall b. (a -> b -> b) -> b -> b) -> Fused a
+fromFoldR xs = Fused (\f l r -> foldBothBy' xs f l r)
+
+{-# INLINE from #-}
+from :: (forall b. (a -> b -> b) -> b -> x -> b) -> x -> Fused a
+from foldr xs = Fused (\f l r -> foldBothBy' (\f z -> foldr f z xs) f l r)
 
 {-# INLINE fuseBoth #-}
 fuseBoth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)

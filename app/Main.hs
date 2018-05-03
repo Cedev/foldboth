@@ -9,7 +9,7 @@ import qualified Data.List.Fused as Fused
 
 {-# INLINE fromBS #-}
 fromBS :: BSL.ByteString -> Fused Word8
-fromBS = Fused.fromList . BSL.unpack
+fromBS = Fused.from BSL.foldr
 
 {-# INLINE splitByte #-}
 splitByte :: Word8 -> Fused Bool
@@ -26,4 +26,4 @@ longestRun = maximum . Fused.map fst . Fused.runLengthEncode
 main :: IO ()
 main = do
     bs <- BSL.getContents
-    print $ Fused.length $ bitStream bs
+    print $ longestRun $ bitStream bs
