@@ -95,8 +95,9 @@ import qualified Prelude
 
 import qualified Data.Foldable
 
-import Control.Monad
+import Control.Arrow (first)
 import Control.Applicative 
+import Control.Monad
 
 import Data.List.FoldBoth
 
@@ -136,6 +137,14 @@ instance Alternative Fused where
     (<|>) = append
           
 instance MonadPlus Fused
+
+instance Show a => Show (Fused a) where
+    show xs = "fromList " ++ show (Data.Foldable.toList xs)
+
+instance Read a => Read (Fused a) where
+    readsPrec p ('f':'r':'o':'m':'L':'i':'s':'t':' ':xs) = first fromList <$> readsPrec p xs
+    readsPrec _ _ = []
+
 
 {-# INLINE map #-}
 map :: (a -> b) -> Fused a -> Fused b
