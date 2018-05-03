@@ -2,15 +2,35 @@
 
 module Data.List.Fused where
 
-newtype Fused a = Fused {fused :: forall l r x y. (a -> x) -> (l -> x -> l) -> (l -> x -> r -> r) -> (l -> x -> r -> y) -> l -> r -> y}
+import Prelude hiding (map, concat, scanl, filter)
+import qualified Prelude
 
-fuseboth :: (l -> a -> l) -> (l -> a -> r -> r) -> (l -> a -> r -> x) -> l -> r -> Fused a -> x
-fuseboth fl fr fy l0 r0 xs = fused xs id fl fr fy l0 r0
+newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r -> (l, r)}
+
+{-# INLINE fuseboth #-}
+fuseboth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)
+fuseboth f lz rz xs = fused xs f lz rz
 
 instance Functor Fused where
-    fmap f xs = Fused (\g fl fr l0 r0 -> fused xs (g . f) fl fr l0 r0)
+    fmap = map
 
 instance Foldable Fused where
-    foldr f z = fuseboth const (const f) (\_ _ r -> r) () z
-    foldl f z = fuseboth f (\_ _ r -> r) (\l _ _ -> l) z ()
-    
+    foldr f z = snd . fuseboth (\_ a r -> ((), f a r)) () z
+    foldl f z = fst . fuseboth (\l a _ -> (f l a, ())) z ()
+
+{-# INLINE map #-}
+map :: (a -> b) -> Fused a -> Fused b
+map f xs = Fused (\g -> fused xs (\l x r -> g l (f x) r))
+
+{-# INLINE concat #-}
+concat :: Fused (Fused a) -> Fused a
+concat xs = Fused (\f -> fused xs (\l ys r -> fused ys f l r))
+
+--{-# INLINE scanl #-}
+--scanl :: (a -> b -> b) -> b -> Fused a -> Fused b
+--scanl s z = Fused (\f lz rz ->  )
+
+{-# INLINE filter #-}
+filter :: (a -> Bool) -> Fused a -> Fused a
+filter p xs = Fused (\f -> fused xs (\l x r -> if p x then f l x r else (l, r)))
+
