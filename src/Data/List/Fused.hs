@@ -164,7 +164,7 @@ append :: Fused a -> Fused a -> Fused a
 append xs ys = Fused (\f lz rz -> 
                     let
                         (l1, r1) = fused xs f lz r2
-                        (l2, r2) = fused ys f l1 rz
+                        ~(l2, r2) = fused ys f l1 rz
                         in (l2, r1))
 
 
@@ -172,7 +172,7 @@ append xs ys = Fused (\f lz rz ->
 scanl :: (b -> a -> b) -> b -> Fused a -> Fused b
 scanl s z xs = Fused (\f lz rz -> 
                         let (l1, r1) = f lz z r2
-                            ((_, l2), r2) = fused xs step (z, l1) rz
+                            ~(~(_, l2), r2) = fused xs step (z, l1) rz
                             step (acc, l) x r =
                                 let acc' = s acc x
                                     (l1, r1) = f l acc' r
@@ -186,9 +186,9 @@ scanl' f = scanl (\b a -> b `seq` f b a)
 {-# INLINE scanr #-}
 scanr :: (a -> b -> b) -> b -> Fused a -> Fused b
 scanr s z xs = Fused (\f lz rz -> 
-                        let (l1, (_, r1)) = fused xs step lz (z, rz)
-                            (l2, r2) = f l1 z rz
-                            step l x (acc, r) =
+                        let (l1, (_, r1)) = fused xs step lz (z, r2)
+                            ~(l2, r2) = f l1 z rz
+                            step l x ~(acc, r) =
                                 let acc' = s x acc
                                     (l1, r1) = f l acc' r
                                     in (l1, (acc', r1))
@@ -199,7 +199,7 @@ scanr s z xs = Fused (\f lz rz ->
 {-# INLINE mapAccumL #-}
 mapAccumL :: (a -> b -> (a, c)) -> a -> Fused b -> Fused c
 mapAccumL s z xs = Fused (\f lz rz ->
-                            let ((_, lf), rf) = fused xs step (z, lz) rz
+                            let (~(_, lf), rf) = fused xs step (z, lz) rz
                                 step (acc, l) x r =
                                     let (acc', y) = s acc x
                                         (l', r') = f l y r
@@ -210,7 +210,7 @@ mapAccumL s z xs = Fused (\f lz rz ->
 mapAccumR :: (a -> b -> (a, c)) -> a -> Fused b -> Fused c
 mapAccumR s z xs = Fused (\f lz rz ->
                             let (lf, (_, rf)) = fused xs step lz (z, rz)
-                                step l x (acc, r) =
+                                step l x ~(acc, r) =
                                     let (acc', y) = s acc x
                                         (l', r') = f l y r
                                         in (l', (acc', r'))
@@ -235,7 +235,7 @@ takeWhile p xs = Fused (\f lz rz ->
 dropWhile :: (a -> Bool) -> Fused a -> Fused a
 dropWhile p xs = Fused (\f lz rz -> 
                           let
-                            ((_, lf), rf) = fused xs dropStep (True, lz) rz
+                            (~(_, lf), rf) = fused xs dropStep (True, lz) rz
                             dropStep (b, l) x r = 
                                 if b && p x
                                 then ((True, l), r)
@@ -257,7 +257,7 @@ take nz xs = Fused (\f lz rz ->
 drop :: Int -> Fused a -> Fused a
 drop nz xs = Fused (\f lz rz -> 
                           let
-                            ((_, lf), rf) = fused xs dropStep (nz, lz) rz
+                            (~(_, lf), rf) = fused xs dropStep (nz, lz) rz
                             dropStep (n, l) x r = 
                                 if n > 0
                                 then ((n - 1, l), r)
@@ -268,14 +268,14 @@ drop nz xs = Fused (\f lz rz ->
 cons :: a -> Fused a -> Fused a
 cons x xs = Fused (\f l r ->
     let (l1, r1) = f l x r2
-        (l2, r2) = fused xs f l1 r
+        ~(l2, r2) = fused xs f l1 r
         in (l2, r1))
 
 {-# INLINE snoc #-}
 snoc :: Fused a -> a -> Fused a
 snoc xs x = Fused (\f l r ->
     let (l1, r1) = fused xs f l r2
-        (l2, r2) = f l1 x r
+        ~(l2, r2) = f l1 x r
         in (l2, r1))
 
 {-# INLINE iterate #-}
@@ -307,14 +307,14 @@ cycle x = xs where xs = x <|> xs
 {-# INLINE intersperse #-}
 intersperse :: a -> Fused a -> Fused a
 intersperse y xs = Fused (\f lz rz ->
-                            let ((_, lf), rf) = fused xs step (False, lz) rz
+                            let (~(_, lf), rf) = fused xs step (False, lz) rz
                                 step (prepend, l) x r = 
                                     let (l', r') =
                                             if prepend 
                                             then
                                                 let
                                                     (l1, r1) = f l y r2
-                                                    (l2, r2) = f l1 x r
+                                                    ~(l2, r2) = f l1 x r
                                                     in (l2, r1)
                                             else f l x r
                                         in ((True, l'), r')
@@ -329,7 +329,7 @@ intercalate x xs = concat (intersperse x xs)
 -- | Compute extrema of a fused list. @'extremaBy' cmp@ will including a value @x@ if @x \`cmp\` y@ holds for the previous extreme value @y@.
 extremaBy :: (a -> a -> Bool) -> Fused a -> Fused a
 extremaBy cmp xs = Fused (\f lz rz -> 
-                    let ((_, lf), rf) = fused xs step ((const True), lz) rz
+                    let (~(_, lf), rf) = fused xs step ((const True), lz) rz
                         step (include, l) x r =
                             if include x
                             then let (l1, r1) = f l x r in (((`cmp` x), l1), r1)
@@ -351,17 +351,17 @@ maximums = extremaBy (>)
 {-# INLINE runLengthEncode #-}
 runLengthEncode :: Eq a => Fused a -> Fused (Int, a)
 runLengthEncode xs = Fused (\f lz rz -> 
-                    let ((_, cf, lf), (_, rf)) = fused xs step ((const True), 0, lz) (cf, rz)
-                        step (split, runlength, l) x (futurelength, r) =
+                    let ~(~(_, cf, lf), (_, rf)) = fused xs step ((const True), 0, lz) (cf, rz)
+                        step (split, !runlength, l) x ~(futurelength, r) =
                             if split x
                             then let (l1, r1) = f l (futurelength, x) r in (((/= x), 1, l1), (runlength, r1))
-                            else ((split, runlength, l), (futurelength, r))
+                            else ((split, runlength + 1, l), (futurelength, r))
                     in (lf, rf))
 
 {-# INLINE group #-}
 group :: Eq a => Fused a -> Fused (Fused a)
 group xs = Fused (\f lz rz -> 
-                    let ((_, lf), (_, rf)) = fused xs step ((const True), lz) (empty, rz)
+                    let (~(_, lf), (_, rf)) = fused xs step ((const True), lz) (empty, rz)
                         step (split, l) x ~(xs, r) =
                             if split x
                             then let (l1, r1) = f l (x `cons` xs) r in (((/= x), l1), (empty, r1))
