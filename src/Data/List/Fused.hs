@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Data.List.Fused (
     Fused(..),
@@ -107,7 +108,7 @@ newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r 
 {-# INLINE fromList #-}
 -- | Convert a list to 'Fused' via its 'foldBoth' function
 fromList :: [a] -> Fused a
-fromList xs = Fused (\f l r -> foldBoth f l r xs)
+fromList xs = Fused (\f l r -> foldBoth' f l r xs)
 
 {-# INLINE fuseBoth #-}
 fuseBoth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)
@@ -219,18 +220,16 @@ mapAccumR s z xs = Fused (\f lz rz ->
 filter :: (a -> Bool) -> Fused a -> Fused a
 filter p xs = Fused (\f -> fused xs (\l x r -> if p x then f l x r else (l, r)))
 
-
 {-# INLINE takeWhile #-}
 takeWhile :: (a -> Bool) -> Fused a -> Fused a
 takeWhile p xs = Fused (\f lz rz -> 
                           let
-                            (l1, (lf, r1)) = fused xs takeStep lz (l1, rz)
-                            takeStep l x (lf, r) = 
+                            ~(l1, (lf, r1)) = fused xs takeStep lz (l1, rz)
+                            takeStep l x ~(lf, r) = 
                                 if p x
                                 then let (l1, r1) = f l x r in (l1, (lf, r1))
                                 else (error "takeWhile", (l, rz))
                             in (lf, r1))
-
 
 {-# INLINE dropWhile #-}
 dropWhile :: (a -> Bool) -> Fused a -> Fused a
@@ -247,8 +246,8 @@ dropWhile p xs = Fused (\f lz rz ->
 take :: Int -> Fused a -> Fused a
 take nz xs = Fused (\f lz rz -> 
                           let
-                            ((_, l1), (lf, r1)) = fused xs takeStep (nz, lz) (l1, rz)
-                            takeStep (n, l) x (lf, r) = 
+                            ~(~(_, l1), (lf, r1)) = fused xs takeStep (nz, lz) (l1, rz)
+                            takeStep (!n, l) x ~(lf, r) = 
                                 if n > 0
                                 then let (l1, r1) = f l x r in ((n - 1, l1), (lf, r1))
                                 else (error "take", (l, rz))
@@ -326,9 +325,6 @@ intercalate :: Fused a -> Fused (Fused a) -> Fused a
 intercalate x xs = concat (intersperse x xs)
 
 
-
--- minimums
-
 {-# INLINE extremaBy #-}
 -- | Compute extrema of a fused list. @'extremaBy' cmp@ will including a value @x@ if @x \`cmp\` y@ holds for the previous extreme value @y@.
 extremaBy :: (a -> a -> Bool) -> Fused a -> Fused a
@@ -366,7 +362,7 @@ runLengthEncode xs = Fused (\f lz rz ->
 group :: Eq a => Fused a -> Fused (Fused a)
 group xs = Fused (\f lz rz -> 
                     let ((_, lf), (_, rf)) = fused xs step ((const True), lz) (empty, rz)
-                        step (split, l) x (xs, r) =
+                        step (split, l) x ~(xs, r) =
                             if split x
                             then let (l1, r1) = f l (x `cons` xs) r in (((/= x), l1), (empty, r1))
                             else ((split, l), (x `cons` xs, r))

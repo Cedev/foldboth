@@ -46,3 +46,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - foldboth
+    - test-framework-th
+    - test-framework-quickcheck2
+    - QuickCheck

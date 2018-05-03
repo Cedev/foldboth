@@ -10,7 +10,7 @@ foldBoth f = go
     go l r (x:xs) = (l'', r'')
       where
         (l', r'') = f l x r'
-        (l'', r') = go l' r xs
+        ~(l'', r') = go l' r xs
 
 -- | A version of 'foldBoth' that is strict in the left argument
 foldBoth' :: (l -> a -> r -> (l , r)) -> l -> r -> [a] -> (l, r)
