@@ -32,6 +32,12 @@ module Data.List.Fused (
     intersperse,
     intercalate,
     
+    extremaBy,
+    minimums,
+    maximums,
+    runLengthEncode,
+    group,
+    
     Data.Foldable.Foldable(..),
     Data.Foldable.foldrM,
     Data.Foldable.foldlM,
@@ -80,7 +86,7 @@ import qualified Prelude
 
 import qualified Data.Foldable
 
-import Control.Monad (ap)
+import Control.Monad
 import Control.Applicative 
 
 import Data.List.FoldBoth
@@ -121,6 +127,8 @@ instance Alternative Fused where
           (l1, r1) = fused xs f lz r2
           (l2, r2) = fused ys f l1 rz
           in (l2, r1))
+          
+instance MonadPlus Fused
 
 {-# INLINE map #-}
 map :: (a -> b) -> Fused a -> Fused b
@@ -160,7 +168,9 @@ scanr s z xs = Fused (\f lz rz ->
                                     (l1, r1) = f l acc' r
                                     in (l1, (acc', r1))
                             in (l2, r1))
-     
+
+-- TODO: easy ways to peek at adjacent items (scanl1, scanr1)
+
 {-# INLINE mapAccumL #-}
 mapAccumL :: (a -> b -> (a, c)) -> a -> Fused b -> Fused c
 mapAccumL s z xs = Fused (\f lz rz ->
@@ -289,3 +299,47 @@ intersperse y xs = Fused (\f lz rz ->
 {-# INLINE intercalate #-}
 intercalate :: Fused a -> Fused (Fused a) -> Fused a
 intercalate x xs = concat (intersperse x xs)
+
+
+
+-- minimums
+
+{-# INLINE extremaBy #-}
+extremaBy :: (a -> a -> Bool) -> Fused a -> Fused a
+extremaBy cmp xs = Fused (\f lz rz -> 
+                    let ((_, lf), rf) = fused xs step ((const True), lz) rz
+                        step (include, l) x r =
+                            if include x
+                            then let (l1, r1) = f l x r in (((`cmp` x), l1), r1)
+                            else ((include, l), r)
+                        in (lf, rf))
+
+{-# INLINE minimums #-}
+minimums :: Ord a => Fused a -> Fused a
+minimums = extremaBy (<)
+
+{-# INLINE maximums #-}
+maximums :: Ord a => Fused a -> Fused a
+maximums = extremaBy (>)
+
+
+-- run length encode
+{-# INLINE runLengthEncode #-}
+runLengthEncode :: Eq a => Fused a -> Fused (Int, a)
+runLengthEncode xs = Fused (\f lz rz -> 
+                    let ((_, cf, lf), (_, rf)) = fused xs step ((const True), 0, lz) (cf, rz)
+                        step (split, runlength, l) x (futurelength, r) =
+                            if split x
+                            then let (l1, r1) = f l (futurelength, x) r in (((/= x), 1, l1), (runlength, r1))
+                            else ((split, runlength, l), (futurelength, r))
+                    in (lf, rf))
+
+{-# INLINE group #-}
+group :: Eq a => Fused a -> Fused (Fused a)
+group xs = Fused (\f lz rz -> 
+                    let ((_, lf), (_, rf)) = fused xs step ((const True), lz) (empty, rz)
+                        step (split, l) x (xs, r) =
+                            if split x
+                            then let (l1, r1) = f l (x `cons` xs) r in (((/= x), l1), (empty, r1))
+                            else ((split, l), (x `cons` xs, r))
+                    in (lf, rf))
