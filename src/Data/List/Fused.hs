@@ -9,6 +9,10 @@ module Data.List.Fused (
     concat,
     concatMap,
     
+    scanl,
+    scanl',
+    scanr,
+    
     filter,
     takeWhile,
     dropWhile,
@@ -44,7 +48,7 @@ module Data.List.Fused (
     Data.Foldable.find
 ) where
 
-import Prelude hiding (map, concat, concatMap, scanl, filter, takeWhile, dropWhile, take, drop, iterate, iterate', repeat, replicate, cycle,)
+import Prelude hiding (map, concat, concatMap, scanl, scanl', scanr, filter, takeWhile, dropWhile, take, drop, iterate, iterate', repeat, replicate, cycle,)
 import qualified Prelude
 
 import qualified Data.Foldable
@@ -96,6 +100,35 @@ concatMap :: (a -> Fused b) -> Fused a -> Fused b
 concatMap k xs = Fused (\f -> fused xs (\l x r -> fused (k x) f l r))
 
 
+{-# INLINE scanl #-}
+scanl :: (b -> a -> b) -> b -> Fused a -> Fused b
+scanl s z xs = Fused (\f lz rz -> 
+                        let (l1, r1) = f lz z r2
+                            ((_, l2), r2) = fused xs step (z, l1) rz
+                            step (acc, l) x r =
+                                let acc' = s acc x
+                                    (l1, r1) = f l acc' r
+                                    in ((acc', l1), r1)
+                            in (l2, r1))
+                            
+{-# INLINE scanl' #-}
+scanl' :: (b -> a -> b) -> b -> Fused a -> Fused b
+scanl' f = scanl (\b a -> b `seq` f b a)
+
+{-# INLINE scanr #-}
+scanr :: (a -> b -> b) -> b -> Fused a -> Fused b
+scanr s z xs = Fused (\f lz rz -> 
+                        let (l1, (_, r1)) = fused xs step lz (z, rz)
+                            (l2, r2) = f l1 z rz
+                            step l x (acc, r) =
+                                let acc' = s x acc
+                                    (l1, r1) = f l acc' r
+                                    in (l1, (acc', r1))
+                            in (l2, r1))
+
+
+
+
 {-# INLINE filter #-}
 filter :: (a -> Bool) -> Fused a -> Fused a
 filter p xs = Fused (\f -> fused xs (\l x r -> if p x then f l x r else (l, r)))
@@ -145,10 +178,6 @@ drop nz xs = Fused (\f lz rz ->
                                 then ((n - 1, l), r)
                                 else let (l1, r1) = f l x r in ((0, l1), r1)
                             in (lf, rf))
-
---{-# INLINE scanl #-}
---scanl :: (a -> b -> b) -> b -> Fused a -> Fused b
---scanl s z = Fused (\f lz rz ->  )
 
 {-# INLINE cons #-}
 cons :: a -> Fused a -> Fused a
