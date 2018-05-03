@@ -3,6 +3,7 @@
 module Data.List.Fused (
     Fused(..),
     fuseboth,
+    fromList,
     
     map,
     concat,
@@ -27,6 +28,9 @@ module Data.List.Fused (
     repeat,
     replicate,
     cycle,
+    
+    intersperse,
+    intercalate,
     
     Data.Foldable.Foldable(..),
     Data.Foldable.foldrM,
@@ -83,6 +87,7 @@ import Data.List.FoldBoth
 
 newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r -> (l, r)}
 
+{-# INLINE fromList #-}
 fromList :: [a] -> Fused a
 fromList xs = Fused (\f l r -> foldboth f l r xs)
 
@@ -263,3 +268,24 @@ replicate n x = take n (repeat x)
 {-# INLINE cycle #-}
 cycle :: Fused a -> Fused a
 cycle x = xs where xs = x <|> xs
+
+
+{-# INLINE intersperse #-}
+intersperse :: a -> Fused a -> Fused a
+intersperse y xs = Fused (\f lz rz ->
+                            let ((_, lf), rf) = fused xs step (False, lz) rz
+                                step (prepend, l) x r = 
+                                    let (l', r') =
+                                            if prepend 
+                                            then
+                                                let
+                                                    (l1, r1) = f l y r2
+                                                    (l2, r2) = f l1 x r
+                                                    in (l2, r1)
+                                            else f l x r
+                                        in ((True, l'), r')
+                                in (lf, rf))
+
+{-# INLINE intercalate #-}
+intercalate :: Fused a -> Fused (Fused a) -> Fused a
+intercalate x xs = concat (intersperse x xs)
