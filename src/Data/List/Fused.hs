@@ -108,7 +108,7 @@ import Data.List.FoldBoth
 import GHC.Exts (oneShot)
 
 -- | A list represented by its 'foldBoth' function.
-newtype Fused a = Fused {fused :: forall l r. (l -> a -> r -> (l, r)) -> l -> r -> (l, r)}
+newtype Fused a = Fused {fused :: forall l r. (l -> a -> (l,  r -> r)) -> l -> r -> (l, r)}
 
 
 {-# INLINE fromFoldable #-}
@@ -130,22 +130,25 @@ from :: (forall b. (a -> b -> b) -> b -> x -> b) -> x -> Fused a
 from foldr xs = Fused (\f l r -> foldBothBy' (\f z -> foldr f z xs) f l r)
 
 {-# INLINE fuseBoth #-}
-fuseBoth :: (l -> a -> r -> (l, r)) -> l -> r -> Fused a -> (l, r)
+fuseBoth :: (l -> a -> (l, r -> r)) -> l -> r -> Fused a -> (l, r)
 fuseBoth f lz rz xs = fused xs f lz rz
 
 instance Functor Fused where
     fmap = map
 
 instance Foldable Fused where
-    foldr f z = snd . fuseBoth (\_ a r -> ((), f a r)) () z
-    foldl f z = fst . fuseBoth (\l a _ -> (f l a, ())) z ()
+    foldr f z = snd . fuseBoth (\_ a -> ((), \r -> f a r)) () z
+    foldl f z = fst . fuseBoth (\l a -> (f l a, \r -> ())) z ()
 
 -- The traversable instance doesn't fuse
 instance Traversable Fused where
     traverse k = fmap fromList . traverse k . Data.Foldable.toList
 
+(>$>) :: (a, b -> c) -> b -> (a, c)
+(a, f) >$> x = (a, f x)
+
 instance Applicative Fused where
-    pure x = Fused (\f l r -> f l x r)
+    pure x = Fused (\f l r -> f l x >$> r)
     (<*>) = ap
     
 instance Monad Fused where
@@ -168,15 +171,15 @@ instance Read a => Read (Fused a) where
 
 {-# INLINE map #-}
 map :: (a -> b) -> Fused a -> Fused b
-map f xs = Fused (\g -> fused xs (\l x r -> g l (f x) r))
+map f xs = Fused (\g -> fused xs (\l x -> g l (f x)))
 
 {-# INLINE concat #-}
 concat :: Fused (Fused a) -> Fused a
-concat xs = Fused (\f -> fused xs (\l ys r -> fused ys f l r))
+concat xs = Fused (\f -> fused xs (\l ys -> fused ys f l))
 
 {-# INLINE concatMap #-}
 concatMap :: (a -> Fused b) -> Fused a -> Fused b
-concatMap k xs = Fused (\f -> fused xs (\l x r -> fused (k x) f l r))
+concatMap k xs = Fused (\f -> fused xs (\l x -> fused (k x) f l))
 
 {-# INLINE append #-}
 append :: Fused a -> Fused a -> Fused a
